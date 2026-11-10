@@ -5,8 +5,8 @@ import telebot
 import traceback
 import threading
 
-BOT_TOKEN = "9271220348:AAFTADt5HAi6FOFbSrgC3DYosd6n1ZNQEIU"
-ADMIN_CHAT_ID = 638562670  # Sizning Telegram ID raqamingiz
+BOT_TOKEN = "9271220348:AAFTADsHAI6F0FhSrgC3DYosd6n1ZMQElU"
+ADMIN_CHAT_ID = 638562670
 
 bot = telebot.TeleBot(BOT_TOKEN, threaded=False)
 USERS_FILE = "users.txt"
@@ -24,7 +24,6 @@ def save_user(chat_id):
         with open(USERS_FILE, "a") as f:
             f.write(f"{chat_id}\n")
 
-# Statistika
 stats_data = {
     "total_signals": 0,
     "tp_count": 0,
@@ -35,10 +34,10 @@ stats_data = {
 def send_statistics(message):
     try:
         text = (
-            f"📊 **YUVORIQLANGAN KUCHLI SIGNALLAR STATISTIKASI** 📊\n\n"
-            f"🤖 Jami yuborilgan signallar: **{stats_data['total_signals']} ta**\n"
-            f"🟢 Foyda bilan yopilgan (TP): **{stats_data['tp_count']} ta**\n"
-            f"🔴 Zarar bilan yopilgan (SL): **{stats_data['sl_count']} ta**\n"
+            f"📊 **YUBorILGAN KUCHLI SIGNALLAR STATISTIKASI** 📊\n\n"
+            f"📌 Jami yuborilgan signallar: **{stats_data['total_signals']}** ta\n"
+            f"🟢 Foyda bilan yuborilgan (TP): **{stats_data['tp_count']}** ta\n"
+            f"🔴 Zarar bilan yuborilgan (SL): **{stats_data['sl_count']}** ta"
         )
         bot.reply_to(message, text, parse_mode="Markdown")
     except Exception as e:
@@ -47,7 +46,7 @@ def send_statistics(message):
 @bot.message_handler(commands=['ping'])
 def send_ping(message):
     try:
-        bot.reply_to(message, "🟢 **Bot faol! Yuqori aniqlikdagi Multi-Factor (RSI + EMA + MACD) strategiyasi ishlamoqda.**", parse_mode="Markdown")
+        bot.reply_to(message, "🟢 **Bot faol!** Yuqori aniqlikdagi Multi-Factor (RSI + EMA + MACD) strategiyasi ishlamoqda.")
     except Exception as e:
         print(f"Ping xatosi: {e}")
 
@@ -55,7 +54,7 @@ def send_ping(message):
 def send_welcome(message):
     chat_id = message.chat.id
     save_user(chat_id)
-    bot.reply_to(message, "🤖 Assalomu alaykum! XAUUSD Ultra-Aniqlikdagi Strategik Botimiz ishga tushdi. Endi faqat eng kuchli va ishonchli signallar yuboriladi.")
+    bot.reply_to(message, "👋 Assalamu alaykum! XAUUSD Ultra-Aniqlikdagi Strategik Botimiz ishga tushdi. Endi faqat eng kuchli signallar yuboriladi.")
 
 def send_signal_to_all_and_get_ids(msg):
     users = load_users()
@@ -68,7 +67,7 @@ def send_signal_to_all_and_get_ids(msg):
             if res.status_code == 200:
                 sent_message_map[chat_id] = res.json()['result']['message_id']
         except Exception as e:
-            print(f"Yuborishda xatolik ({chat_id}):", e)
+            print(f"Yuborishda xatolik ({chat_id}): {e}")
     return sent_message_map
 
 def edit_message_for_all(sent_map, new_msg):
@@ -78,50 +77,40 @@ def edit_message_for_all(sent_map, new_msg):
         try:
             requests.post(url, data=payload, timeout=15)
         except Exception as e:
-            print(f"Tahrirlashda xatolik ({chat_id}):", e)
+            print(f"Tahrirlashda xatolik ({chat_id}): {e}")
 
 price_history = []
-last_signal_time = None
-last_signal_price = None
-COOLDOWN_MINUTES = 120  # Signal oralig'i kamida 2 soat qilib uzaytirildi (100% sifat uchun)
-daily_signal_count = 0
 active_trades = []
+last_signal_time = None
+COOLDOWN_MINUTES = 120
+daily_signal_count = 0
 
 def get_gold_price_safely():
-    url = "https://api.gold-api.com/price/XAU"
-    for attempt in range(3):
-        try:
-            response = requests.get(url, timeout=10)
-            if response.status_code == 200:
-                price = response.json().get("price")
-                if price:
-                    return float(price)
-        except Exception as e:
-            print(f"[{attempt+1}/3] API narx olishda xatolik: {e}")
-        time.sleep(3)
+    try:
+        url = "https://api.gold-api.com/price/XAU"
+        res = requests.get(url, timeout=10)
+        if res.status_code == 200:
+            data = res.json()
+            return float(data.get("price", 0))
+    except Exception as e:
+        print(f"Narx olish xatosi: {e}")
     return None
 
-def is_market_session_safe():
-    now_utc = datetime.now(timezone.utc)
-    if now_utc.weekday() >= 5:
-        return False
-    return 7 <= now_utc.hour <= 20  # Faqat aktiv sessiya vaqtlari
-
-def calculate_ema(prices, period):
-    if len(prices) < period:
-        return sum(prices) / len(prices)
+def calculate_ema(data, period):
+    if len(data) < period:
+        return data[-1]
     multiplier = 2 / (period + 1)
-    ema = sum(prices[:period]) / period
-    for price in prices[period:]:
+    ema = data[0]
+    for price in data[1:]:
         ema = (price - ema) * multiplier + ema
     return ema
 
-def calculate_rsi(prices, period=14):
-    if len(prices) < period + 1:
-        return 50.0  # Yetarli ma'lumot bo'lmasa neytral qiymat
+def calculate_rsi(data, period=14):
+    if len(data) < period + 1:
+        return 50.0
     gains, losses = 0, 0
-    for i in range(1, len(prices)):
-        change = prices[i] - prices[i-1]
+    for i in range(1, len(data)):
+        change = data[i] - data[i-1]
         if change > 0:
             gains += change
         else:
@@ -131,132 +120,114 @@ def calculate_rsi(prices, period=14):
     if avg_loss == 0:
         return 100.0
     rs = avg_gain / avg_loss
-    rsi = 100 - (100 / (1 + rs))
-    return rsi
+    return 100 - (100 / (1 + rs))
 
-def calculate_macd(prices):
-    if len(prices) < 26:
-        return 0, 0
-    ema12 = calculate_ema(prices, 12)
-    ema26 = calculate_ema(prices, 26)
-    macd_line = ema12 - ema26
-    return macd_line
+def calculate_macd(data):
+    if len(data) < 26:
+        return 0.0
+    ema12 = calculate_ema(data, 12)
+    ema26 = calculate_ema(data, 26)
+    return ema12 - ema26
 
 def check_active_trades(current_price):
     global active_trades, stats_data
-    trades_to_remove = []
-
+    remaining_trades = []
     for trade in active_trades:
-        trade_type = trade['type']
-        tp = trade['tp']
-        sl = trade['sl']
+        trade_id = trade['id']
+        t_type = trade['type']
         entry = trade['entry']
+        sl = trade['sl']
+        tp = trade['tp']
         sent_map = trade['sent_map']
-
-        is_tp = False
-        is_sl = False
-
-        if "BUY" in trade_type:
-            if current_price >= tp: is_tp = True
-            elif current_price <= sl: is_sl = True
-        elif "SELL" in trade_type:
-            if current_price <= tp: is_tp = True
-            elif current_price >= sl: is_sl = True
-
-        if is_tp:
-            profit_pips = abs(round(tp - entry, 2))
+        
+        hit_tp = False
+        hit_sl = False
+        
+        if "BUY" in t_type:
+            if current_price >= tp:
+                hit_tp = True
+            elif current_price <= sl:
+                hit_sl = True
+        elif "SELL" in t_type:
+            if current_price <= tp:
+                hit_tp = True
+            elif current_price >= sl:
+                hit_sl = True
+                
+        if hit_tp:
             stats_data["tp_count"] += 1
-            updated_msg = f"🏆 **ULTRA-SIGNAL NATIJASI** 🏆\n\n📊 **Savdo:** {trade_type}\n💵 **Kirish:** {entry}\n🛡 **SL:** {sl}\n🎯 **TP:** {tp}\n\n🟢 **TAKE PROFIT (FOYDA) MUVAFFAQIYATLI BAJARILDI! (+{profit_pips}$ 🚀)**"
-            edit_message_for_all(sent_map, updated_msg)
-            trades_to_remove.append(trade)
-        elif is_sl:
-            loss_pips = abs(round(entry - sl, 2))
+            edit_message_for_all(sent_map, f"✅ **{t_type}**\n🎯 **TAKE PROFIT (TP) GA YETDI!**\nKirish: {entry}\nNatija: Muvaffaqiyatli foyda 🟢")
+        elif hit_sl:
             stats_data["sl_count"] += 1
-            updated_msg = f"🛡 **ULTRA-SIGNAL NATIJASI** 🛡\n\n📊 **Savdo:** {trade_type}\n💵 **Kirish:** {entry}\n🛡 **SL:** {sl}\n🎯 **TP:** {tp}\n\n🔴 **STOP LOSS ISHLADI (-{loss_pips}$ ❌)**"
-            edit_message_for_all(sent_map, updated_msg)
-            trades_to_remove.append(trade)
-
-    for item in trades_to_remove:
-        active_trades.remove(item)
+            edit_message_for_all(sent_map, f"❌ **{t_type}**\n🛑 **STOP LOSS (SL) GA TEGISHLI BO'LDI!**\nKirish: {entry}\nNatija: Zarar kesildi 🔴")
+        else:
+            remaining_trades.append(trade)
+            
+    active_trades = remaining_trades
 
 def check_gold_filters():
-    global daily_signal_count, active_trades, last_signal_time, last_signal_price, stats_data
-    try:
-        if not is_market_session_safe():
-            print("Bozor sessiyasi vaqti emas.")
-            return
+    global last_signal_time, daily_signal_count, price_history
+    current_price = get_gold_price_safely()
+    if not current_price:
+        return
 
-        current_price = get_gold_price_safely()
-        if not current_price:
-            print("Narx olinmadi.")
-            return
+    check_active_trades(current_price)
 
-        print(f"Tahlildagi joriy narx: {current_price}")
-        check_active_trades(current_price)
+    if active_trades:
+        return
 
-        if len(active_trades) > 0:
-            print("Hozirda ochiq savdo mavjud, yangi signal kutilmaydi...")
-            return
+    price_history.append(current_price)
+    if len(price_history) > 30:
+        price_history.pop(0)
+    if len(price_history) < 20:
+        return
 
-        price_history.append(current_price)
-        if len(price_history) > 30: price_history.pop(0)
-        if len(price_history) < 20:
-            print("Yetarli narx tarixi yig'ilmoqda...")
-            return
+    ema_short = calculate_ema(price_history, 10)
+    ema_long = calculate_ema(price_history, 30)
+    rsi = calculate_rsi(price_history, 14)
+    macd = calculate_macd(price_history)
 
-        # ---- KUCHLI INDIKATORLAR VA FILTRLAR ----
-        ema_short = calculate_ema(price_history, 10)
-        ema_long = calculate_ema(price_history, 30)
-        rsi = calculate_rsi(price_history, 14)
-        macd = calculate_macd(price_history)
+    trade_type = None
 
-        trade_type = None
+    if current_price > ema_long and rsi < 38 and macd > 0:
+        trade_type = "🟢 ULTRA BUY (Trend + RSI + MACD)"
+        sl_price = round(current_price - 5.0, 2)
+        tp_price = round(current_price + 12.0, 2)
+    elif current_price < ema_long and rsi > 62 and macd < 0:
+        trade_type = "🔴 ULTRA SELL (Trend + RSI + MACD)"
+        sl_price = round(current_price + 5.0, 2)
+        tp_price = round(current_price - 12.0, 2)
 
-        # 100% talabingizga mos: Faqat barcha shartlar mukammal mos kelgandagina signal beradi
-        # BUY: Narx qisqa EMA dan yuqori, RSI oversold (< 35) zonadan qaytmoqda va MACD musbat
-        if current_price > ema_long and rsi <= 38 and macd > 0:
-            trade_type = "🟢 ULTRA BUY (Trend + RSI + MACD)"
-            sl_price, tp_price = round(current_price - 5.0, 2), round(current_price + 12.0, 2)
+    if trade_type and can_send_signal():
+        daily_signal_count += 1
+        stats_data["total_signals"] += 1
+        last_signal_time = datetime.now()
 
-        # SELL: Narx qisqa EMA dan past, RSI overbought (> 65) zonadan qaytmoqda va MACD manfiy
-        elif current_price < ema_long and rsi >= 62 and macd < 0:
-            trade_type = "🔴 ULTRA SELL (Trend + RSI + MACD)"
-            sl_price, tp_price = round(current_price + 5.0, 2), round(current_price - 12.0, 2)
+        signal_msg = (
+            f"💎 **XAUUSD ULTRA-ANIQLIKDAGI SIGNAL** 💎\n\n"
+            f"📊 **Savdo turi:** {trade_type}\n"
+            f"🎯 **Kirish narxi:** {current_price}\n"
+            f"🛑 **Stop Loss (SL):** {sl_price}\n"
+            f"🎯 **Take Profit (TP):** {tp_price}\n"
+            f"📈 **RSI ko'rsatkichi:** {round(rsi, 1)}\n"
+            f"💡 **Holat:** Yuqori ehtimolli savdo ochildi..."
+        )
+        sent_map = send_signal_to_all_and_get_ids(signal_msg)
 
-        if trade_type and can_send_signal():
-            daily_signal_count += 1
-            stats_data["total_signals"] += 1
-            last_signal_time = datetime.now()
-            
-            signal_msg = (
-                f"💎 **XAUUSD ULTRA-ANIQLIKDAGI SIGNAL** 💎\n\n"
-                f"📊 **Savdo turi:** {trade_type}\n"
-                f"💵 **Kirish narxi:** {current_price}\n"
-                f"🛡 **Stop Loss (SL):** {sl_price}\n"
-                f"🎯 **Take Profit (TP):** {tp_price}\n"
-                f"📈 **RSI ko'rsatkichi:** {round(rsi, 1)}\n\n"
-                f"⏳ *Holat: Yuqori ehtimolli savdo ochildi...*"
-            )
-            sent_map = send_signal_to_all_and_get_ids(signal_msg)
-            
-            active_trades.append({
-                'id': daily_signal_count,
-                'type': trade_type,
-                'entry': current_price,
-                'sl': sl_price,
-                'tp': tp_price,
-                'sent_map': sent_map
-            })
-            print(f"Ultra-signal yuborildi: {trade_type}")
-    except Exception as e:
-        print("Tahlil xatoligi:", e)
+        active_trades.append({
+            'id': daily_signal_count,
+            'type': trade_type,
+            'entry': current_price,
+            'sl': sl_price,
+            'tp': tp_price,
+            'sent_map': sent_map
+        })
 
 def can_send_signal():
     global last_signal_time
-    now = datetime.now()
     if last_signal_time is None:
         return True
-    # 2 soatlik (120 daqiqa) qat'iy tanaffus oralig'i
+    now = datetime.now()
     if (now - last_signal_time).total_seconds() / 60 >= COOLDOWN_MINUTES:
         return True
     return False
@@ -266,8 +237,8 @@ def background_loop():
         try:
             check_gold_filters()
         except Exception as e:
-            print("Tsikl xatosi:", e)
-        time.sleep(180)  # Har 3 daqiqada tekshiradi
+            print(f"Tahlil xatosi: {e}")
+        time.sleep(180)
 
 t = threading.Thread(target=background_loop, daemon=True)
 t.start()
@@ -275,8 +246,7 @@ t.start()
 if __name__ == "__main__":
     print("Ultra-Aniqlikdagi Strategik Bot muvaffaqiyatli ishga tushdi...")
     while True:
-        try:bot.infinity_polling(non_stop=True, interval=1, timeout=30)
-            
+        try:
             bot.infinity_polling(non_stop=True, interval=1, timeout=30, skip_pending=True)
         except Exception as e:
             print(f"Ulanish uzildi, qayta ulanmoqda: {e}")
