@@ -207,14 +207,15 @@ def check_gold_filters():
 
     trade_type = None
 
+    # Xavfsizroq kengaytirilgan SL (8.0) va TP (18.0) parametrlari
     if current_price > ema_long and rsi < 38 and macd > 0:
         trade_type = "🟢 ULTRA BUY (Trend + RSI + MACD)"
-        sl_price = round(current_price - 5.0, 2)
-        tp_price = round(current_price + 12.0, 2)
+        sl_price = round(current_price - 8.0, 2)
+        tp_price = round(current_price + 18.0, 2)
     elif current_price < ema_long and rsi > 62 and macd < 0:
         trade_type = "🔴 ULTRA SELL (Trend + RSI + MACD)"
-        sl_price = round(current_price + 5.0, 2)
-        tp_price = round(current_price - 12.0, 2)
+        sl_price = round(current_price + 8.0, 2)
+        tp_price = round(current_price - 18.0, 2)
 
     if trade_type and can_send_signal():
         daily_signal_count += 1
