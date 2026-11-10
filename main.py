@@ -275,7 +275,8 @@ t.start()
 if __name__ == "__main__":
     print("Ultra-Aniqlikdagi Strategik Bot muvaffaqiyatli ishga tushdi...")
     while True:
-        try:
+        try:bot.infinity_polling(non_stop=True, interval=1, timeout=30)
+            
             bot.infinity_polling(non_stop=True, interval=1, timeout=30, skip_pending=True)
         except Exception as e:
             print(f"Ulanish uzildi, qayta ulanmoqda: {e}")
