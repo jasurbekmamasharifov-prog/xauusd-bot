@@ -1,9 +1,27 @@
+import os
+from http.server import HTTPServer, BaseHTTPRequestHandler
+import threading
 import time
 import requests
 from datetime import datetime, timezone
 import telebot
 import traceback
-import threading
+
+# Render port talabini qondirish uchun kichik HTTP server
+class SimpleHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"XAUUSD Bot is active and running 24/7!")
+
+def run_server():
+    port = int(os.environ.get("PORT", 10000))
+    server = HTTPServer(('0.0.0.0', port), SimpleHandler)
+    server.serve_forever()
+
+# Serverni alohida oqimda (thread) ishga tushiramiz, shunda asosiy bot ishiga xalaqit bermaydi
+server_thread = threading.Thread(target=run_server, daemon=True)
+server_thread.start()
 
 BOT_TOKEN = "9271220348:AAFTADsHAI6F0FhSrgC3DYosd6n1ZMQElU"
 ADMIN_CHAT_ID = 638562670
