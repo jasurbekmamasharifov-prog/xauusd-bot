@@ -5,14 +5,13 @@ import time
 import requests
 from datetime import datetime
 import telebot
-import google.generativeai as genai
 
 # 1. Render port talabini qondirish uchun HTTP server
 class SimpleHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
         self.end_headers()
-        self.wfile.write(b"XAUUSD AI Bot is active and running 24/7!")
+        self.wfile.write(b"XAUUSD AI-Enhanced Bot is active and running 24/7!")
 
 def run_server():
     port = int(os.environ.get("PORT", 10000))
@@ -24,16 +23,10 @@ server_thread.start()
 
 # 2. BOT VA IA SOZLAMALARI
 BOT_TOKEN = "9271220348:AAFTADsHAI6F0FhSrgC3DYosd6n1ZMQElU"
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")  # Render Environment variable orqali beriladi
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")  # Render Environment dan olinadi
 
 bot = telebot.TeleBot(BOT_TOKEN, threaded=False)
 USERS_FILE = "users.txt"
-
-if GEMINI_API_KEY:
-    genai.configure(api_key=GEMINI_API_KEY)
-    ai_model = genai.GenerativeModel('gemini-1.5-flash')
-else:
-    ai_model = None
 
 def load_users():
     try:
@@ -54,14 +47,13 @@ stats_data = {
     "sl_count": 0
 }
 
-# 3. IA SHILD / TASDIQLASH MEXANIZMI
+# 3. GEMINI AI BILAN BOG'LANISH (Kutubxonasiz, to'g'ridan-to'g'ri HTTP orqali)
 def verify_signal_with_ai(trade_type, current_price, rsi, macd, ema_short, ema_long):
-    """
-    IA bozordagi vaziyatni o'rganib, 90%+ ishonchlilik uchun signalni tasdiqlaydi yoki rad etadi.
-    """
-    if not ai_model:
-        return True, "IA Kaliti ulanmagan, faqat indikatorlar bo'yicha."
+    if not GEMINI_API_KEY:
+        return True, "IA Kaliti kiritilmagan (Standart filtr)"
 
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
+    
     prompt = f"""
     You are an expert XAUUSD (Gold) risk manager for a $100 trading account.
     Analyze this entry signal:
@@ -74,28 +66,38 @@ def verify_signal_with_ai(trade_type, current_price, rsi, macd, ema_short, ema_l
     SL Distance: 10 points
     TP Distance: 20 points
 
-    Should we execute this trade? Answer ONLY with 'CONFIRM' if high probability (>90%), or 'REJECT' if risky or weak.
+    Should we execute this trade? Answer ONLY with 'CONFIRM' if high probability (>90%), or 'REJECT' if risky.
     """
+    
+    payload = {
+        "contents": [{
+            "parts": [{"text": prompt}]
+        }]
+    }
+    
     try:
-        response = ai_model.generate_content(prompt)
-        res_text = response.text.upper().strip()
-        if "CONFIRM" in res_text:
-            return True, "AI Tasdiqladi 🟢"
-        else:
-            return False, "AI Rad etdi (Yuqori risk) 🔴"
+        response = requests.post(url, json=payload, timeout=10)
+        if response.status_code == 200:
+            data = response.json()
+            ai_text = data['candidates'][0]['content']['parts'][0]['text'].upper()
+            if "CONFIRM" in ai_text:
+                return True, "AI Tasdiqladi (>90% ishonch) 🟢"
+            else:
+                return False, "AI xavfli deb rad etdi 🔴"
     except Exception as e:
-        print(f"AI Tahlil xatosi: {e}")
-        return True, "AI Tahlilida xatolik, standart filtr ishlatildi."
+        print(f"AI So'rov xatosi: {e}")
+    
+    return True, "AI ulanishida vaqtinchalik xato, texnik filtr o'tdi."
 
 # 4. TELEGRAM BUYRUQLARI
 @bot.message_handler(commands=['stats'])
 def send_statistics(message):
     try:
         text = (
-            f"📊 **AI VA STRATEGIYA STATISTIKASI** 📊\n\n"
-            f"📌 Jami yuborilgan signallar: **{stats_data['total_signals']}** ta\n"
-            f"🟢 Foyda bilan yuborilgan (TP): **{stats_data['tp_count']}** ta\n"
-            f"🔴 Zarar bilan yuborilgan (SL): **{stats_data['sl_count']}** ta"
+            f"📊 **IA-ENHANCED SIGNAL STATISTIKASI** 📊\n\n"
+            f"📌 Jami signallar: **{stats_data['total_signals']}** ta\n"
+            f"🟢 TP: **{stats_data['tp_count']}** ta\n"
+            f"🔴 SL: **{stats_data['sl_count']}** ta"
         )
         bot.reply_to(message, text, parse_mode="Markdown")
     except Exception as e:
@@ -104,8 +106,8 @@ def send_statistics(message):
 @bot.message_handler(commands=['ping'])
 def send_ping(message):
     try:
-        ai_status = "Ulangan 🤖" if ai_model else "Kutilmoqda (API key kiritilmagan) ⚠️"
-        bot.reply_to(message, f"🟢 **Bot faol!**\n💎 Strategiya: 10/20 punkt\n🧠 IA Tizimi: {ai_status}")
+        ai_status = "Faol va Ulangan 🤖" if GEMINI_API_KEY else "Kutilmoqda (API Key qo'shilmagan) ⚠️"
+        bot.reply_to(message, f"🟢 **Bot faol!**\n💎 Strategiya: 10/20 punkt\n🧠 Gemini AI: {ai_status}")
     except Exception as e:
         print(f"Ping xatosi: {e}")
 
@@ -113,7 +115,7 @@ def send_ping(message):
 def send_welcome(message):
     chat_id = message.chat.id
     save_user(chat_id)
-    bot.reply_to(message, "👋 Assalamu alaykum! XAUUSD IA-Enhanced Signal Botimiz ishga tushdi.")
+    bot.reply_to(message, "👋 Assalamu alaykum! XAUUSD Sun'iy Intellekt Boshqaruvidagi Risk-Menedjment Botimiz ishga tushdi.")
 
 @bot.message_handler(commands=['test'])
 def send_test_signal(message):
@@ -126,16 +128,16 @@ def send_test_signal(message):
         tp_price = round(current_price + 20.0, 2)
 
         signal_msg = (
-            f"🧪 **TEST SIGNAL (IA + $100 DEP.)** 🧪\n\n"
+            f"🧪 **TEST SIGNAL (GEMINI AI + $100)** 🧪\n\n"
             f"📊 **Savdo turi:** 🟢 ULTRA BUY (Test)\n"
             f"🎯 **Kirish narxi:** {current_price}\n"
             f"🛑 **Stop Loss (SL):** {sl_price} (-10.0 punkt)\n"
             f"🎯 **Take Profit (TP):** {tp_price} (+20.0 punkt)\n"
-            f"🧠 **IA Tahlili:** Signal 90%+ ishonch bilan tasdiqlandi\n"
-            f"📈 **Holat:** Xavfsiz 10/20 rejimida sinovdan o'tkazilmoqda..."
+            f"🧠 **IA Tahlili:** 90%+ ehtimollik bilan tasdiqlandi\n"
+            f"📈 **Holat:** Xavfsiz rejimda sinovdan o'tkazilmoqda..."
         )
-        send_signal_to_all_and_get_ids(signal_msg)
-        bot.reply_to(message, "✅ IA test signali yuborildi!")
+        sent_map = send_signal_to_all_and_get_ids(signal_msg)
+        bot.reply_to(message, "✅ IA test signali muvaffaqiyatli yuborildi!")
     except Exception as e:
         bot.reply_to(message, f"Test yuborishda xatolik: {e}")
 
@@ -162,7 +164,7 @@ def edit_message_for_all(sent_map, new_msg):
         except Exception as e:
             print(f"Tahrirlashda xatolik ({chat_id}): {e}")
 
-# 5. TAHLIL VA RISK ALGORITMI
+# 5. TAHLIL VA FILTRLAR
 price_history = []
 active_trades = []
 last_signal_time = None
@@ -282,7 +284,7 @@ def check_gold_filters():
         tp_price = round(current_price - 20.0, 2)
 
     if raw_trade_type and can_send_signal():
-        # IA orqali 2-bosqich tekshiruvi
+        # IA orqali tekshiruvdan o'tkazamiz
         is_confirmed, ai_note = verify_signal_with_ai(raw_trade_type, current_price, rsi, macd, ema_short, ema_long)
 
         if is_confirmed:
@@ -291,12 +293,12 @@ def check_gold_filters():
             last_signal_time = datetime.now()
 
             signal_msg = (
-                f"💎 **XAUUSD IA-VERIFIED SIGNAL** 💎\n\n"
+                f"💎 **XAUUSD IA-VERIFIED SIGNAL ($100)** 💎\n\n"
                 f"📊 **Savdo turi:** {raw_trade_type}\n"
                 f"🎯 **Kirish narxi:** {current_price}\n"
                 f"🛑 **Stop Loss (SL):** {sl_price} (-10.0 punkt)\n"
                 f"🎯 **Take Profit (TP):** {tp_price} (+20.0 punkt)\n"
-                f"🧠 **IA Xulosasi:** {ai_note}\n"
+                f"🧠 **Gemini AI Xulosasi:** {ai_note}\n"
                 f"📈 **RSI:** {round(rsi, 1)}"
             )
             sent_map = send_signal_to_all_and_get_ids(signal_msg)
@@ -310,7 +312,7 @@ def check_gold_filters():
                 'sent_map': sent_map
             })
         else:
-            print(f"Signal IA tomonidan rad etildi: {ai_note}")
+            print(f"Signal AI tomonidan rad etildi: {ai_note}")
 
 def can_send_signal():
     global last_signal_time
@@ -333,7 +335,7 @@ t = threading.Thread(target=background_loop, daemon=True)
 t.start()
 
 if __name__ == "__main__":
-    print("IA bilan kuchaytirilgan bot ishga tushdi...")
+    print("IA Bilan Ishlaydigan Bot Boshlanmoqda...")
     while True:
         try:
             bot.remove_webhook()
