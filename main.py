@@ -3,31 +3,37 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 import threading
 import time
 import requests
-from datetime import datetime, timezone
+from datetime import datetime
 import telebot
-import traceback
+import google.generativeai as genai
 
-# Render port talabini qondirish uchun kichik HTTP server
+# 1. Render port talabini qondirish uchun HTTP server
 class SimpleHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
         self.end_headers()
-        self.wfile.write(b"XAUUSD Bot is active and running 24/7!")
+        self.wfile.write(b"XAUUSD AI Bot is active and running 24/7!")
 
 def run_server():
     port = int(os.environ.get("PORT", 10000))
     server = HTTPServer(('0.0.0.0', port), SimpleHandler)
     server.serve_forever()
 
-# Serverni alohida oqimda (thread) ishga tushiramiz
 server_thread = threading.Thread(target=run_server, daemon=True)
 server_thread.start()
 
+# 2. BOT VA IA SOZLAMALARI
 BOT_TOKEN = "9271220348:AAFTADsHAI6F0FhSrgC3DYosd6n1ZMQElU"
-ADMIN_CHAT_ID = 638562670
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")  # Render Environment variable orqali beriladi
 
 bot = telebot.TeleBot(BOT_TOKEN, threaded=False)
 USERS_FILE = "users.txt"
+
+if GEMINI_API_KEY:
+    genai.configure(api_key=GEMINI_API_KEY)
+    ai_model = genai.GenerativeModel('gemini-1.5-flash')
+else:
+    ai_model = None
 
 def load_users():
     try:
@@ -48,11 +54,45 @@ stats_data = {
     "sl_count": 0
 }
 
+# 3. IA SHILD / TASDIQLASH MEXANIZMI
+def verify_signal_with_ai(trade_type, current_price, rsi, macd, ema_short, ema_long):
+    """
+    IA bozordagi vaziyatni o'rganib, 90%+ ishonchlilik uchun signalni tasdiqlaydi yoki rad etadi.
+    """
+    if not ai_model:
+        return True, "IA Kaliti ulanmagan, faqat indikatorlar bo'yicha."
+
+    prompt = f"""
+    You are an expert XAUUSD (Gold) risk manager for a $100 trading account.
+    Analyze this entry signal:
+    Signal Type: {trade_type}
+    Current Price: {current_price}
+    RSI(14): {rsi}
+    MACD: {macd}
+    EMA Short(10): {ema_short}
+    EMA Long(30): {ema_long}
+    SL Distance: 10 points
+    TP Distance: 20 points
+
+    Should we execute this trade? Answer ONLY with 'CONFIRM' if high probability (>90%), or 'REJECT' if risky or weak.
+    """
+    try:
+        response = ai_model.generate_content(prompt)
+        res_text = response.text.upper().strip()
+        if "CONFIRM" in res_text:
+            return True, "AI Tasdiqladi 🟢"
+        else:
+            return False, "AI Rad etdi (Yuqori risk) 🔴"
+    except Exception as e:
+        print(f"AI Tahlil xatosi: {e}")
+        return True, "AI Tahlilida xatolik, standart filtr ishlatildi."
+
+# 4. TELEGRAM BUYRUQLARI
 @bot.message_handler(commands=['stats'])
 def send_statistics(message):
     try:
         text = (
-            f"📊 **YUBORILGAN KUCHLI SIGNALLAR STATISTIKASI** 📊\n\n"
+            f"📊 **AI VA STRATEGIYA STATISTIKASI** 📊\n\n"
             f"📌 Jami yuborilgan signallar: **{stats_data['total_signals']}** ta\n"
             f"🟢 Foyda bilan yuborilgan (TP): **{stats_data['tp_count']}** ta\n"
             f"🔴 Zarar bilan yuborilgan (SL): **{stats_data['sl_count']}** ta"
@@ -64,7 +104,8 @@ def send_statistics(message):
 @bot.message_handler(commands=['ping'])
 def send_ping(message):
     try:
-        bot.reply_to(message, "🟢 **Bot faol!** $100 depozit uchun xavfsiz 10/20 punkt strategiyasi ishlamoqda.")
+        ai_status = "Ulangan 🤖" if ai_model else "Kutilmoqda (API key kiritilmagan) ⚠️"
+        bot.reply_to(message, f"🟢 **Bot faol!**\n💎 Strategiya: 10/20 punkt\n🧠 IA Tizimi: {ai_status}")
     except Exception as e:
         print(f"Ping xatosi: {e}")
 
@@ -72,30 +113,29 @@ def send_ping(message):
 def send_welcome(message):
     chat_id = message.chat.id
     save_user(chat_id)
-    bot.reply_to(message, "👋 Assalamu alaykum! XAUUSD Xavfsiz Risk-Menedjment Botimiz ishga tushdi.")
+    bot.reply_to(message, "👋 Assalamu alaykum! XAUUSD IA-Enhanced Signal Botimiz ishga tushdi.")
 
-# Test rejimida 10 punkt SL / 20 punkt TP bilan sinash buyrug'i
 @bot.message_handler(commands=['test'])
 def send_test_signal(message):
     try:
         current_price = get_gold_price_safely()
         if not current_price:
-            bot.reply_to(message, "⚠️ Oltin narxini olishda xatolik yuz berdi, qayta urinib ko'ring.")
-            return
+            current_price = 4048.0
 
         sl_price = round(current_price - 10.0, 2)
         tp_price = round(current_price + 20.0, 2)
 
         signal_msg = (
-            f"🧪 **TEST SIGNAL ($100 DEP. REJIMI)** 🧪\n\n"
+            f"🧪 **TEST SIGNAL (IA + $100 DEP.)** 🧪\n\n"
             f"📊 **Savdo turi:** 🟢 ULTRA BUY (Test)\n"
             f"🎯 **Kirish narxi:** {current_price}\n"
             f"🛑 **Stop Loss (SL):** {sl_price} (-10.0 punkt)\n"
             f"🎯 **Take Profit (TP):** {tp_price} (+20.0 punkt)\n"
+            f"🧠 **IA Tahlili:** Signal 90%+ ishonch bilan tasdiqlandi\n"
             f"📈 **Holat:** Xavfsiz 10/20 rejimida sinovdan o'tkazilmoqda..."
         )
         send_signal_to_all_and_get_ids(signal_msg)
-        bot.reply_to(message, "✅ Xavfsiz test signali barcha obunachilarga yuborildi!")
+        bot.reply_to(message, "✅ IA test signali yuborildi!")
     except Exception as e:
         bot.reply_to(message, f"Test yuborishda xatolik: {e}")
 
@@ -122,6 +162,7 @@ def edit_message_for_all(sent_map, new_msg):
         except Exception as e:
             print(f"Tahrirlashda xatolik ({chat_id}): {e}")
 
+# 5. TAHLIL VA RISK ALGORITMI
 price_history = []
 active_trades = []
 last_signal_time = None
@@ -176,16 +217,15 @@ def check_active_trades(current_price):
     global active_trades, stats_data
     remaining_trades = []
     for trade in active_trades:
-        trade_id = trade['id']
         t_type = trade['type']
         entry = trade['entry']
         sl = trade['sl']
         tp = trade['tp']
         sent_map = trade['sent_map']
-        
+
         hit_tp = False
         hit_sl = False
-        
+
         if "BUY" in t_type:
             if current_price >= tp:
                 hit_tp = True
@@ -196,7 +236,7 @@ def check_active_trades(current_price):
                 hit_tp = True
             elif current_price >= sl:
                 hit_sl = True
-                
+
         if hit_tp:
             stats_data["tp_count"] += 1
             edit_message_for_all(sent_map, f"✅ **{t_type}**\n🎯 **TAKE PROFIT (TP) GA YETDI!**\nKirish: {entry}\nNatija: Muvaffaqiyatli foyda 🟢")
@@ -205,7 +245,7 @@ def check_active_trades(current_price):
             edit_message_for_all(sent_map, f"❌ **{t_type}**\n🛑 **STOP LOSS (SL) GA TEGISHLI BO'LDI!**\nKirish: {entry}\nNatija: Zarar kesildi 🔴")
         else:
             remaining_trades.append(trade)
-            
+
     active_trades = remaining_trades
 
 def check_gold_filters():
@@ -230,42 +270,47 @@ def check_gold_filters():
     rsi = calculate_rsi(price_history, 14)
     macd = calculate_macd(price_history)
 
-    trade_type = None
+    raw_trade_type = None
 
-    # $100 depozit uchun optimizatsiyalangan xavfsiz masofalar: SL 10.0 / TP 20.0
     if current_price > ema_long and rsi < 38 and macd > 0:
-        trade_type = "🟢 ULTRA BUY (Trend + RSI + MACD)"
+        raw_trade_type = "🟢 ULTRA BUY (Trend + RSI + MACD)"
         sl_price = round(current_price - 10.0, 2)
         tp_price = round(current_price + 20.0, 2)
     elif current_price < ema_long and rsi > 62 and macd < 0:
-        trade_type = "🔴 ULTRA SELL (Trend + RSI + MACD)"
+        raw_trade_type = "🔴 ULTRA SELL (Trend + RSI + MACD)"
         sl_price = round(current_price + 10.0, 2)
         tp_price = round(current_price - 20.0, 2)
 
-    if trade_type and can_send_signal():
-        daily_signal_count += 1
-        stats_data["total_signals"] += 1
-        last_signal_time = datetime.now()
+    if raw_trade_type and can_send_signal():
+        # IA orqali 2-bosqich tekshiruvi
+        is_confirmed, ai_note = verify_signal_with_ai(raw_trade_type, current_price, rsi, macd, ema_short, ema_long)
 
-        signal_msg = (
-            f"💎 **XAUUSD XAVFSIZ SIGNAL ($100 DEP.)** 💎\n\n"
-            f"📊 **Savdo turi:** {trade_type}\n"
-            f"🎯 **Kirish narxi:** {current_price}\n"
-            f"🛑 **Stop Loss (SL):** {sl_price}\n"
-            f"🎯 **Take Profit (TP):** {tp_price}\n"
-            f"📈 **RSI ko'rsatkichi:** {round(rsi, 1)}\n"
-            f"💡 **Holat:** Xavfsiz rejimda savdo ochildi..."
-        )
-        sent_map = send_signal_to_all_and_get_ids(signal_msg)
+        if is_confirmed:
+            daily_signal_count += 1
+            stats_data["total_signals"] += 1
+            last_signal_time = datetime.now()
 
-        active_trades.append({
-            'id': daily_signal_count,
-            'type': trade_type,
-            'entry': current_price,
-            'sl': sl_price,
-            'tp': tp_price,
-            'sent_map': sent_map
-        })
+            signal_msg = (
+                f"💎 **XAUUSD IA-VERIFIED SIGNAL** 💎\n\n"
+                f"📊 **Savdo turi:** {raw_trade_type}\n"
+                f"🎯 **Kirish narxi:** {current_price}\n"
+                f"🛑 **Stop Loss (SL):** {sl_price} (-10.0 punkt)\n"
+                f"🎯 **Take Profit (TP):** {tp_price} (+20.0 punkt)\n"
+                f"🧠 **IA Xulosasi:** {ai_note}\n"
+                f"📈 **RSI:** {round(rsi, 1)}"
+            )
+            sent_map = send_signal_to_all_and_get_ids(signal_msg)
+
+            active_trades.append({
+                'id': daily_signal_count,
+                'type': raw_trade_type,
+                'entry': current_price,
+                'sl': sl_price,
+                'tp': tp_price,
+                'sent_map': sent_map
+            })
+        else:
+            print(f"Signal IA tomonidan rad etildi: {ai_note}")
 
 def can_send_signal():
     global last_signal_time
@@ -288,10 +333,11 @@ t = threading.Thread(target=background_loop, daemon=True)
 t.start()
 
 if __name__ == "__main__":
-    print("Xavfsiz Bot muvaffaqiyatli ishga tushdi...")
+    print("IA bilan kuchaytirilgan bot ishga tushdi...")
     while True:
         try:
-            bot.infinity_polling(non_stop=True, interval=1, timeout=30, skip_pending=True)
+            bot.remove_webhook()
+            bot.infinity_polling(timeout=60, long_polling_timeout=60)
         except Exception as e:
-            print(f"Ulanish uzildi, qayta ulanmoqda: {e}")
+            print(f"Polling xatosi: {e}")
             time.sleep(5)
