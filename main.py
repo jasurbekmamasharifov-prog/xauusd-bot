@@ -19,7 +19,7 @@ def run_server():
     server = HTTPServer(('0.0.0.0', port), SimpleHandler)
     server.serve_forever()
 
-# Serverni alohida oqimda (thread) ishga tushiramiz, shunda asosiy bot ishiga xalaqit bermaydi
+# Serverni alohida oqimda (thread) ishga tushiramiz
 server_thread = threading.Thread(target=run_server, daemon=True)
 server_thread.start()
 
@@ -52,7 +52,7 @@ stats_data = {
 def send_statistics(message):
     try:
         text = (
-            f"📊 **YUBorILGAN KUCHLI SIGNALLAR STATISTIKASI** 📊\n\n"
+            f"📊 **YUBORILGAN KUCHLI SIGNALLAR STATISTIKASI** 📊\n\n"
             f"📌 Jami yuborilgan signallar: **{stats_data['total_signals']}** ta\n"
             f"🟢 Foyda bilan yuborilgan (TP): **{stats_data['tp_count']}** ta\n"
             f"🔴 Zarar bilan yuborilgan (SL): **{stats_data['sl_count']}** ta"
@@ -64,7 +64,7 @@ def send_statistics(message):
 @bot.message_handler(commands=['ping'])
 def send_ping(message):
     try:
-        bot.reply_to(message, "🟢 **Bot faol!** Yuqori aniqlikdagi Multi-Factor (RSI + EMA + MACD) strategiyasi ishlamoqda.")
+        bot.reply_to(message, "🟢 **Bot faol!** $100 depozit uchun xavfsiz 10/20 punkt strategiyasi ishlamoqda.")
     except Exception as e:
         print(f"Ping xatosi: {e}")
 
@@ -72,7 +72,32 @@ def send_ping(message):
 def send_welcome(message):
     chat_id = message.chat.id
     save_user(chat_id)
-    bot.reply_to(message, "👋 Assalamu alaykum! XAUUSD Ultra-Aniqlikdagi Strategik Botimiz ishga tushdi. Endi faqat eng kuchli signallar yuboriladi.")
+    bot.reply_to(message, "👋 Assalamu alaykum! XAUUSD Xavfsiz Risk-Menedjment Botimiz ishga tushdi.")
+
+# Test rejimida 10 punkt SL / 20 punkt TP bilan sinash buyrug'i
+@bot.message_handler(commands=['test'])
+def send_test_signal(message):
+    try:
+        current_price = get_gold_price_safely()
+        if not current_price:
+            bot.reply_to(message, "⚠️ Oltin narxini olishda xatolik yuz berdi, qayta urinib ko'ring.")
+            return
+
+        sl_price = round(current_price - 10.0, 2)
+        tp_price = round(current_price + 20.0, 2)
+
+        signal_msg = (
+            f"🧪 **TEST SIGNAL ($100 DEP. REJIMI)** 🧪\n\n"
+            f"📊 **Savdo turi:** 🟢 ULTRA BUY (Test)\n"
+            f"🎯 **Kirish narxi:** {current_price}\n"
+            f"🛑 **Stop Loss (SL):** {sl_price} (-10.0 punkt)\n"
+            f"🎯 **Take Profit (TP):** {tp_price} (+20.0 punkt)\n"
+            f"📈 **Holat:** Xavfsiz 10/20 rejimida sinovdan o'tkazilmoqda..."
+        )
+        send_signal_to_all_and_get_ids(signal_msg)
+        bot.reply_to(message, "✅ Xavfsiz test signali barcha obunachilarga yuborildi!")
+    except Exception as e:
+        bot.reply_to(message, f"Test yuborishda xatolik: {e}")
 
 def send_signal_to_all_and_get_ids(msg):
     users = load_users()
@@ -207,15 +232,15 @@ def check_gold_filters():
 
     trade_type = None
 
-    # Xavfsizroq kengaytirilgan SL (8.0) va TP (18.0) parametrlari
+    # $100 depozit uchun optimizatsiyalangan xavfsiz masofalar: SL 10.0 / TP 20.0
     if current_price > ema_long and rsi < 38 and macd > 0:
         trade_type = "🟢 ULTRA BUY (Trend + RSI + MACD)"
-        sl_price = round(current_price - 8.0, 2)
-        tp_price = round(current_price + 18.0, 2)
+        sl_price = round(current_price - 10.0, 2)
+        tp_price = round(current_price + 20.0, 2)
     elif current_price < ema_long and rsi > 62 and macd < 0:
         trade_type = "🔴 ULTRA SELL (Trend + RSI + MACD)"
-        sl_price = round(current_price + 8.0, 2)
-        tp_price = round(current_price - 18.0, 2)
+        sl_price = round(current_price + 10.0, 2)
+        tp_price = round(current_price - 20.0, 2)
 
     if trade_type and can_send_signal():
         daily_signal_count += 1
@@ -223,13 +248,13 @@ def check_gold_filters():
         last_signal_time = datetime.now()
 
         signal_msg = (
-            f"💎 **XAUUSD ULTRA-ANIQLIKDAGI SIGNAL** 💎\n\n"
+            f"💎 **XAUUSD XAVFSIZ SIGNAL ($100 DEP.)** 💎\n\n"
             f"📊 **Savdo turi:** {trade_type}\n"
             f"🎯 **Kirish narxi:** {current_price}\n"
             f"🛑 **Stop Loss (SL):** {sl_price}\n"
             f"🎯 **Take Profit (TP):** {tp_price}\n"
             f"📈 **RSI ko'rsatkichi:** {round(rsi, 1)}\n"
-            f"💡 **Holat:** Yuqori ehtimolli savdo ochildi..."
+            f"💡 **Holat:** Xavfsiz rejimda savdo ochildi..."
         )
         sent_map = send_signal_to_all_and_get_ids(signal_msg)
 
@@ -263,7 +288,7 @@ t = threading.Thread(target=background_loop, daemon=True)
 t.start()
 
 if __name__ == "__main__":
-    print("Ultra-Aniqlikdagi Strategik Bot muvaffaqiyatli ishga tushdi...")
+    print("Xavfsiz Bot muvaffaqiyatli ishga tushdi...")
     while True:
         try:
             bot.infinity_polling(non_stop=True, interval=1, timeout=30, skip_pending=True)
