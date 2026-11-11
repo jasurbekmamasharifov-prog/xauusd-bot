@@ -51,12 +51,12 @@ stats_data = {
 XAUUSD_STRUCTURES = {
     1: {
         "name": "1-Struktura: Dual-Wick Rejection Zone",
-        "condition": "Qo'llab-quvvatlash zonasida ikkita ketma-ket uzun soya (wick) hosil bo'lishi",
+        "condition": "Qollab-quvvatlash zonasida ikkita ketma-ket uzun soya hosil bolishi",
         "action": "BUY"
     },
     2: {
         "name": "2-Struktura: Support Breakdown",
-        "condition": "M15 tana bilan qo'llab-quvvatlash chizig'ini pastga kesib o'tishi",
+        "condition": "M15 tana bilan qollab-quvvatlash chizigini pastga kesib otishi",
         "action": "SELL"
     },
     3: {
@@ -66,12 +66,12 @@ XAUUSD_STRUCTURES = {
     },
     4: {
         "name": "4-Struktura: RSI Extreme Reversal",
-        "condition": "RSI(14) < 35 zonasidan yuqoriga kesib o'tishi yoki > 65 dan pastga tushishi",
+        "condition": "RSI(14) < 35 zonasidan yuqoriga kesib otishi yoki > 65 dan pastga tushishi",
         "action": "REVERSAL BUY/SELL"
     },
     5: {
         "name": "5-Struktura: MACD Zero-Line Cross",
-        "condition": "MACD chizig'ining nol chizig'ini kesib o'tish momenti",
+        "condition": "MACD chizigining nol chizigini kesib otish momenti",
         "action": "MOMENTUM TRADE"
     },
     6: {
@@ -81,17 +81,17 @@ XAUUSD_STRUCTURES = {
     },
     7: {
         "name": "7-Struktura: Volume Spike Confirmation",
-        "condition": "O'rtacha hajm hajmidan 2 baravar yuqori sham yopilishi",
+        "condition": "Ortacha hajm hajmidan 2 baravar yuqori sham yopilishi",
         "action": "BREAKOUT"
     },
     8: {
         "name": "8-Struktura: Golden Pocket Retracement",
-        "condition": "Fibo 0.618 darajasidan aniq reksiya olishi",
+        "condition": "Fibo 0.618 darajasidan aniq reaksiya olishi",
         "action": "BUY/SELL"
     },
     9: {
         "name": "9-Struktura: Inside Bar Breakout",
-        "condition": "Ichki sham (Inside Bar) shakllangandan keyingi impulsiv chiqish",
+        "condition": "Ichki sham shakllangandan keyingi impulsiv chiqish",
         "action": "BREAKOUT DIRECTION"
     },
     10: {
@@ -101,7 +101,7 @@ XAUUSD_STRUCTURES = {
     },
     11: {
         "name": "11-Struktura: Adaptive Multi-Layer Confluence",
-        "condition": "Yuqoridagi 10 ta shartdan kamida 3 tasi bir vaqtning o'zida mos kelishi",
+        "condition": "Yuqoridagi 10 ta shartdan kamida 3 tasi bir vaqtning ozida mos kelishi",
         "action": "ULTRA CONFIRM BUY/SELL"
     }
 }
@@ -144,28 +144,28 @@ def verify_signal_with_ai(trade_type, current_price, rsi, macd, ema_short, ema_l
             else:
                 return False, "AI xavfli deb rad etdi 🔴"
     except Exception as e:
-        print(f"AI So'rov xatosi: {e}")
+        print(f"AI Sorov xatosi: {e}")
     
-    return True, "AI ulanishida vaqtinchalik xato, texnik filtr o'tdi."
+    return True, "AI ulanishida vaqtinchalik xato, texnik filtr otdi."
 
 # 4. TELEGRAM BUYRUQLARI
 @bot.message_handler(commands=['stats'])
 def send_statistics(message):
     try:
         text = (
-            f"📊 **SIGNALLAR STATISTIKASI** 📊\n\n"
-            f"📌 Jami signallar: **{stats_data['total_signals']}** ta\n"
-            f"🟢 TP: **{stats_data['tp_count']}** ta\n"
-            f"🔴 SL: **{stats_data['sl_count']}** ta"
+            f"SIGNALLAR STATISTIKASI\n\n"
+            f"Jami signallar: {stats_data['total_signals']} ta\n"
+            f"TP: {stats_data['tp_count']} ta\n"
+            f"SL: {stats_data['sl_count']} ta"
         )
-        bot.reply_to(message, text, parse_mode="Markdown")
+        bot.reply_to(message, text)
     except Exception as e:
         print(f"Statistika xatosi: {e}")
 
 @bot.message_handler(commands=['ping'])
 def send_ping(message):
     try:
-        bot.reply_to(message, "🟢 **Bot faol, kanal va 11 ta strukturaviy qoida bilan ishlamoqda!**")
+        bot.reply_to(message, "Bot faol, kanal va 11 ta strukturaviy qoida bilan ishlamoqda!")
     except Exception as e:
         print(f"Ping xatosi: {e}")
 
@@ -173,15 +173,15 @@ def send_ping(message):
 def send_welcome(message):
     chat_id = message.chat.id
     save_user(chat_id)
-    bot.reply_to(message, "👋 Assalamu alaykum! XAUUSD Xavfsiz Risk-Menedjment va 11-Struktura Boti ishga tushdi.\n\nBuyruqlar:\n/structures - 11 ta qoida va struktirani ko'rish\n/test - Test signal olish\n/stats - Statistika")
+    bot.reply_to(message, "Assalamu alaykum! XAUUSD Xavfsiz Risk-Menedjment va 11-Struktura Boti ishga tushdi.\n\nBuyruqlar:\n/structures - 11 ta qoida va strukturani korish\n/test - Test signal olish\n/stats - Statistika")
 
 @bot.message_handler(commands=['structures'])
 def send_structures(message):
     try:
-        text = "📐 **XAUUSD 11 TA STRUKTURA VA QOIDALAR** 📐\n\n"
+        text = "XAUUSD 11 TA STRUKTURA VA QOIDALAR:\n\n"
         for s_id, s_info in XAUUSD_STRUCTURES.items():
-            text += f"🔹 **{s_info['name']}**\n   • Shart: {s_info['condition']}\n   • Harakat: `{s_info['action']}`\n\n"
-        bot.reply_to(message, text, parse_mode="Markdown")
+            text += f"{s_info['name']}\n   Shart: {s_info['condition']}\n   Harakat: {s_info['action']}\n\n"
+        bot.reply_to(message, text)
     except Exception as e:
         print(f"Structures xatosi: {e}")
 
@@ -196,16 +196,17 @@ def send_test_signal(message):
         tp_price = round(current_price + 20.0, 2)
 
         signal_msg = (
-            f"💎 **XAUUSD PREMIUM AI-VERIFIED SIGNAL** 💎\n\n"
-            f"📊 **Savdo turi:** 🟢 **ULTRA BUY (11-Struktura asosida)**\n"
-            f"🎯 **Kirish narxi (Entry):** Joriy bozor narxidan (${current_price} atrofida)\n"
-            f"🛑 **Stop Loss (SL):** ${sl_price} *(-10.0 punkt)*\n"
-            f"🎯 **Take Profit (TP):** ${tp_price} *(+20.0 punkt)*\n\n"
-            f"🧠 **Gemini AI & 11-Qoida Xulosasi:**\n"
-            f"• **Struktura:** Dual-Wick va Multi-Layer Confluence tasdiqlandi.\n"
-            f"• **AI Tasdig'i:** 92.5% ehtimollik bilan ruxsat berildi (CONFIRM)."
+            f"XAUUSD PREMIUM AI-VERIFIED SIGNAL\n\n"
+            f"Savdo turi: ULTRA BUY (11-Struktura asosida)\n"
+            f"Kirish narxi (Entry): Joriy bozor narxidan ({current_price} atrofida)\n"
+            f"Stop Loss (SL): ${sl_price} (-10.0 punkt)\n"
+            f"Take Profit (TP): ${tp_price} (+20.0 punkt)\n\n"
+            f"Gemini AI & 11-Qoida Xulosasi:\n"
+            f"• Struktura: Dual-Wick va Multi-Layer Confluence tasdiqlandi.\n"
+            f"• AI Tasdigi: 92.5% ehtimollik bilan ruxsat berildi (CONFIRM)."
         )
-        send_signal_to_all_and_get_ids(signal_msg)
+        # To'g'ridan-to'g'ri yuboruvchiga javob qaytarish uchun reply_to ishlatamiz
+        bot.reply_to(message, signal_msg)
     except Exception as e:
         bot.reply_to(message, f"Test yuborishda xatolik: {e}")
 
@@ -214,11 +215,11 @@ def send_signal_to_all_and_get_ids(msg):
     sent_message_map = {}
     for chat_id in users:
         url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-        payload = {"chat_id": chat_id, "text": msg, "parse_mode": "Markdown"}
+        payload = {"chat_id": chat_id, "text": msg}
         try:
             res = requests.post(url, data=payload, timeout=15)
             if res.status_code == 200:
-                sent_message_map[chat_id] = res.json()['result']['message_id']
+                sent_message_map[int(chat_id)] = res.json()['result']['message_id']
         except Exception as e:
             print(f"Yuborishda xatolik ({chat_id}): {e}")
     return sent_message_map
@@ -226,7 +227,7 @@ def send_signal_to_all_and_get_ids(msg):
 def edit_message_for_all(sent_map, new_msg):
     for chat_id, msg_id in sent_map.items():
         url = f"https://api.telegram.org/bot{BOT_TOKEN}/editMessageText"
-        payload = {"chat_id": chat_id, "message_id": msg_id, "text": new_msg, "parse_mode": "Markdown"}
+        payload = {"chat_id": chat_id, "message_id": msg_id, "text": new_msg}
         try:
             requests.post(url, data=payload, timeout=15)
         except Exception as e:
@@ -309,10 +310,10 @@ def check_active_trades(current_price):
 
         if hit_tp:
             stats_data["tp_count"] += 1
-            edit_message_for_all(sent_map, f"✅ **{t_type}**\n🎯 **TAKE PROFIT (TP) GA YETDI!**\nKirish: {entry}\nNatija: Muvaffaqiyatli foyda 🟢")
+            edit_message_for_all(sent_map, f"{t_type}\nTAKE PROFIT (TP) GA YETDI!\nKirish: {entry}\nNatija: Muvaffaqiyatli foyda 🟢")
         elif hit_sl:
             stats_data["sl_count"] += 1
-            edit_message_for_all(sent_map, f"❌ **{t_type}**\n🛑 **STOP LOSS (SL) GA TEGISHLI BO'LDI!**\nKirish: {entry}\nNatija: Zarar kesildi 🔴")
+            edit_message_for_all(sent_map, f"{t_type}\nSTOP LOSS (SL) GA TEGISHLI BOLDI!\nKirish: {entry}\nNatija: Zarar kesildi 🔴")
         else:
             remaining_trades.append(trade)
 
@@ -343,11 +344,11 @@ def check_gold_filters():
     raw_trade_type = None
 
     if current_price > ema_long and rsi < 38 and macd > 0:
-        raw_trade_type = "🟢 ULTRA BUY (11-Struktura + RSI + MACD)"
+        raw_trade_type = "ULTRA BUY (11-Struktura + RSI + MACD)"
         sl_price = round(current_price - 10.0, 2)
         tp_price = round(current_price + 20.0, 2)
     elif current_price < ema_long and rsi > 62 and macd < 0:
-        raw_trade_type = "🔴 ULTRA SELL (11-Struktura + RSI + MACD)"
+        raw_trade_type = "ULTRA SELL (11-Struktura + RSI + MACD)"
         sl_price = round(current_price + 10.0, 2)
         tp_price = round(current_price - 20.0, 2)
 
@@ -360,13 +361,13 @@ def check_gold_filters():
             last_signal_time = datetime.now()
 
             signal_msg = (
-                f"💎 **XAUUSD PREMIUM AI-VERIFIED SIGNAL** 💎\n\n"
-                f"📊 **Savdo turi:** {raw_trade_type}\n"
-                f"🎯 **Kirish narxi:** {current_price}\n"
-                f"🛑 **Stop Loss (SL):** {sl_price} (-10.0 punkt)\n"
-                f"🎯 **Take Profit (TP):** {tp_price} (+20.0 punkt)\n"
-                f"🧠 **Gemini AI Xulosasi:** {ai_note}\n"
-                f"📈 **RSI:** {round(rsi, 1)}"
+                f"XAUUSD PREMIUM AI-VERIFIED SIGNAL\n\n"
+                f"Savdo turi: {raw_trade_type}\n"
+                f"Kirish narxi: {current_price}\n"
+                f"Stop Loss (SL): {sl_price} (-10.0 punkt)\n"
+                f"Take Profit (TP): {tp_price} (+20.0 punkt)\n"
+                f"Gemini AI Xulosasi: {ai_note}\n"
+                f"RSI: {round(rsi, 1)}"
             )
             sent_map = send_signal_to_all_and_get_ids(signal_msg)
 
